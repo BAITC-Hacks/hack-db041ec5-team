@@ -1,5 +1,7 @@
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import pandas as pd
 import pytest
@@ -73,3 +75,27 @@ def test_failed_core_is_reported(tmp_path):
         run_pipeline(tmp_path / 'missing', tmp_path / 'out')
     report = json.loads((tmp_path / 'out' / 'run_report.json').read_text(encoding='utf-8'))
     assert report['status'] == 'failed'
+
+
+def test_cli_with_default_config(tmp_path, sample_network):
+    """Проверить объединённый A/B через CLI со всеми штатными extras."""
+    root = Path(__file__).resolve().parents[1]
+    data, out = tmp_path / 'data', tmp_path / 'output'
+    data.mkdir()
+    for name, frame in zip(['nodes', 'edges', 'transactions'], sample_network):
+        frame.to_parquet(data / f'{name}.parquet', index=False)
+    result = subprocess.run(
+        [sys.executable, str(root / 'run.py'), '--data', str(data),
+         '--out', str(out), '--config', str(root / 'config.yaml')],
+        cwd=root, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=300,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    check_outputs(out, len(sample_network[0]))
+    for name in ['resilience', 'cycles', 'cluster_metrics', 'next_requests']:
+        assert (out / f'{name}.csv').exists()
+    resilience = pd.read_csv(out / 'resilience.csv')
+    assert len(resilience) == 12
+    assert set(resilience.strategy) == {'priority', 'degree', 'random'}
+    report = json.loads((out / 'run_report.json').read_text(encoding='utf-8'))
+    assert report['attribution']['converged']
+    assert report['priority_stability']['runs'] == 200
