@@ -3,7 +3,7 @@
 **Трек:** Финансы · **Кейс:** восстановление финансовой структуры организованной группы по транзакционной сети.
 
 > 🌐 **Онлайн-демо:** https://moneygraph-hackalem.vercel.app (без пароля, конкурсный набор уже рассчитан)
-> 🎬 **Видео работы:** https://youtu.be/QDlFrvzWyag · резервное видео: [docs/demo/backup-demo.mp4](docs/demo/backup-demo.mp4)
+> 🎬 **Видео работы:** https://youtu.be/76Vf1yPgT2w
 
 ![Обзор: 2 248 участников, роли и кластеры](docs/screens/overview.png)
 
