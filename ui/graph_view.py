@@ -93,7 +93,7 @@ def graph_html(nodes, edges, height=620, highlight=None, edge_labels=False):
                        "nodes":{"font":{"size":13},"borderWidth":1}}""")
     for n in nodes:
         net.add_node(
-            int(n["id"]),
+            str(n["id"]),
             label=str(n["id"]) if n["show_label"] else " ",
             x=n["x"],
             y=n["y"],
@@ -107,8 +107,8 @@ def graph_html(nodes, edges, height=620, highlight=None, edge_labels=False):
     for e in edges:
         extra = {"label": fmt_kzt(e["sum_kzt"])} if edge_labels else {}
         net.add_edge(
-            int(e["source"]),
-            int(e["target"]),
+            str(e["source"]),
+            str(e["target"]),
             arrows="to",
             value=math.log1p(e["sum_kzt"]),
             title=f"{fmt_kzt(e['sum_kzt'])} · {e['n_tx']} операций",

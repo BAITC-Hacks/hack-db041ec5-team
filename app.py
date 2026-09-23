@@ -20,6 +20,9 @@ from ui.pages import (
 from ui.style import apply_style
 
 ROOT = Path(__file__).resolve().parent
+DEFAULT_OUTPUT = ROOT / 'output'
+if not (DEFAULT_OUTPUT / 'nodes_roles.csv').is_file() and (DEFAULT_OUTPUT / 'real' / 'nodes_roles.csv').is_file():
+    DEFAULT_OUTPUT = DEFAULT_OUTPUT / 'real'
 load_dotenv(ROOT / ".env", override=False)
 st.set_page_config(
     page_title="Граф денег · Аналитика сети", page_icon="◉", layout="wide"
@@ -43,7 +46,7 @@ with st.sidebar:
     with st.expander("Источники данных", expanded=False):
         out_dir = st.text_input(
             "Папка output",
-            value=os.getenv("MONEYGRAPH_OUTPUT_DIR", str(ROOT / "output")),
+            value=os.getenv("MONEYGRAPH_OUTPUT_DIR", str(DEFAULT_OUTPUT)),
         )
         data_dir = st.text_input(
             "Папка data", value=os.getenv("MONEYGRAPH_DATA_DIR", str(ROOT / "data"))

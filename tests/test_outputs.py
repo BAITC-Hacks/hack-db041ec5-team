@@ -105,6 +105,36 @@ def test_real_metrics_match_organizer_starter(real_output):
     assert actual.index.equals(baseline.index)
 
 
+def test_real_outputs_in_ui_and_offline_tools(real_output):
+    from assistant.tools import get_node, simulate_removal
+    from ui.data import load_context
+    from ui.graph_view import graph_records, graph_html
+    root = Path(__file__).resolve().parents[1]
+    ctx = load_context(real_output, root / 'data', root / 'config.yaml')
+    assert not ctx.warnings and not ctx.missing
+    assert len(ctx.graph) == 2248 and len(ctx.tx) == 4840
+    gid = int(ctx.frames['top_nodes'].iloc[0].gid)
+    assert get_node(ctx, str(gid))['gid'] == gid
+    nodes, edges = graph_records(ctx, highlight=gid)
+    html = graph_html(nodes, edges, highlight=gid)
+    assert f'"id": "{gid}"' in html
+    assert simulate_removal(ctx, [gid])['available']
+
+
+def test_real_streamlit_search(real_output, monkeypatch):
+    from streamlit.testing.v1 import AppTest
+    root = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv('MONEYGRAPH_OUTPUT_DIR', str(real_output))
+    monkeypatch.setenv('MONEYGRAPH_DATA_DIR', str(root / 'data'))
+    monkeypatch.setenv('MONEYGRAPH_DEMO', '0')
+    gid = str(pd.read_csv(real_output / 'top_nodes.csv').iloc[0].gid)
+    app = AppTest.from_file(str(root / 'app.py'), default_timeout=60).run()
+    assert not app.exception and len(app.tabs) == 7
+    app.text_input(key='gid_query').set_value(gid).run()
+    assert not app.exception
+    assert any(f'gid {gid}' in item.value for item in app.markdown)
+
+
 def test_failed_core_is_reported(tmp_path):
     with pytest.raises(FileNotFoundError):
         run_pipeline(tmp_path / 'missing', tmp_path / 'out')

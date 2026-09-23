@@ -3,5 +3,5 @@ $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 $pythonExe = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $pythonExe)) { throw 'Создайте .venv и установите requirements-lock.txt по README.md' }
-if ($Demo) { $env:MONEYGRAPH_DEMO = '1' }
+$env:MONEYGRAPH_DEMO = if ($Demo) { '1' } else { '0' }
 & $pythonExe -m streamlit run app.py --server.address 127.0.0.1

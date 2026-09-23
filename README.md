@@ -8,16 +8,20 @@
 ## Веб-приложение и dashboard
 
 Части A/B/C объединены. Запуск, демо и установка без интернета: [RUN_WEB](docs/RUN_WEB.md).
-Схема: [ARCHITECTURE](docs/ARCHITECTURE.md). Актуальная проверка: [VERIFICATION_CURRENT](docs/VERIFICATION_CURRENT.md).
+Схема: [ARCHITECTURE](docs/ARCHITECTURE.md). Проверка объединения с реальными данными: [ABC_INTEGRATION](docs/ABC_INTEGRATION.md).
 
 Быстрый запуск после установки requirements-lock.txt:
 ```powershell
-.\start.ps1 -Demo
+.\start.ps1
 ```
+
+Откроется реальный датасет: интерфейс использует `output/`, а при отсутствии
+выгрузок в нём — `output/real/`. Вложенное `data/data/` поддерживается.
+Отдельный вымышленный пример включается через `start.ps1 -Demo`.
 
 ## Быстрый старт расчётного ядра
 
-Python 3.12; зависимости частей A/B:
+Python 3.12; зависимости частей A/B/C:
 
 ```powershell
 python -m venv .venv

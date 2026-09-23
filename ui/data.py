@@ -38,6 +38,14 @@ SCHEMAS = {
 REQUIRED = ("nodes_roles", "top_nodes", "clusters")
 
 
+def data_directory(path):
+    """Поддержать data/data после распаковки, сохранив режим неполных данных."""
+    root = Path(path)
+    if not (root / 'transactions.parquet').is_file() and (root / 'data' / 'transactions.parquet').is_file():
+        return root / 'data'
+    return root
+
+
 def clean(value):
     """Компактные JSON-совместимые значения; NaN/Infinity превращаются в null."""
     if isinstance(value, dict):
@@ -101,6 +109,7 @@ class Context:
 
 
 def file_signature(out_dir, data_dir, cfg_path):
+    data_dir = data_directory(data_dir)
     paths = [Path(out_dir) / f"{name}.csv" for name in SCHEMAS]
     paths += [Path(out_dir) / "graph.json", Path(cfg_path)]
     paths += [
@@ -159,7 +168,7 @@ def _frame(path, required, ctx):
                 if not all(math.isfinite(float(v)) and float(v) >= 0 for v in df[col]):
                     raise ValueError(f"{col}: нужны конечные неотрицательные числа")
                 if (
-                    col in ("priority_score", "role_score", "lcc_share", "flow_share")
+                    col in ("priority_score", "role_score", "lcc_share")
                     and (df[col] > 1).any()
                 ):
                     raise ValueError(f"{col}: нужны значения от 0 до 1")
@@ -266,6 +275,7 @@ def assemble(
 
 def load_context(out_dir, data_dir, cfg_path):
     out_dir, data_dir, cfg_path = Path(out_dir), Path(data_dir), Path(cfg_path)
+    data_dir = data_directory(data_dir)
     state = Context()
     frames = {
         name: _frame(out_dir / f"{name}.csv", columns, state)
