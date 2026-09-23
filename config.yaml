@@ -1,0 +1,25 @@
+seed: 42
+features: {frontier_depth: 4, fast_pass_days: 2, pagerank_max_iter: 1000, betweenness_k: null}
+attribution: {max_iter: 200, tol_kzt: 0.000001, min_source_kzt: 10000, min_source_share: 0.01}
+clusters: {resolution: 1.0, stability_runs: 20}
+layout: {iterations: 50, scale: 1500}
+roles:
+  evidence_max_len: 200
+  consolidator: {min_in_deg: 5, ramp_in_deg: [4, 12], ramp_seed_sources: [1, 5], ramp_evenness: [0.3, 0.8], frontier_penalty: 0.8}
+  distributor: {min_out_deg: 10, ramp_out_deg: [8, 40], ramp_evenness: [0.3, 0.8]}
+  transit: {max_in_deg: 3, max_out_deg: 3, pass_min: 0.8, pass_max: 1.2, seed_penalty: 0.8}
+  terminal: {max_pass: 0.2, min_in_quantile: 0.5, high_in_quantile: 0.95}
+  coordinator: {seed_sources_q: 0.95, seed_sources_min: 3, min_role_neighbors: 2, min_clusters_touched: 3, betweenness_q: 0.99, min_signals: 2}
+  peripheral: {frontier_cap: 0.5}
+priority:
+  weights: {money: 0.35, convergence: 0.20, position: 0.15, role: 0.30}
+  role_weight: {coordinator: 1.0, consolidator: 0.9, distributor: 0.8, transit: 0.6, terminal: 0.5, peripheral: 0.1}
+  seed_discount: 0.85
+  top_n: 50
+  flags: {fast_pass_min: 0.8, same_day_payers_min: 5}
+  stability: {runs: 200, concentration: 50, top_k: 20}
+hypotheses: {min_seeds: 2, distributor_degree: 30, transit_share: 0.3, frontier_share: 0.6, top_n: 5}
+gaps: {frontier_quantile: 0.9, external_quantile: 0.75, top_k: 20, max_gids: 20}
+resilience: {sizes: [5, 10, 20, 50], random_runs: 20, min_flow_depth: 2}
+patterns: {max_length: 5, max_cycles: 10000}
+extras: {patterns: true, resilience: true, cluster_stability: true}
