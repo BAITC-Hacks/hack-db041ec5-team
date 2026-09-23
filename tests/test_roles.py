@@ -69,3 +69,17 @@ def test_seed_transit_and_frontier_override(cfg):
     assert assign(f, cfg).loc[2, 'role_score'] == pytest.approx(0.24)
     f.loc[2, 'is_frontier'] = True
     assert assign(f, cfg).loc[2, 'role'] == 'peripheral'
+
+
+def test_frontier_cannot_be_distributor_or_coordinator(cfg):
+    f = features()
+    f.loc[1, 'is_frontier'] = True
+    f.loc[7, ['seed_sources', 'n_clusters_touched']] = [5, 3]
+    f.loc[7, 'is_frontier'] = True
+    r = assign(f, cfg)
+    assert r.loc[1, 'role'] == 'peripheral'
+    assert r.loc[7, 'role'] == 'peripheral'
+    assert r.loc[[1, 7], 'secondary_role'].eq('').all()
+    f.loc[0, 'is_frontier'] = True
+    f.loc[0, ['seed_sources', 'n_clusters_touched']] = [5, 3]
+    assert assign(f, cfg).loc[0, 'role'] == 'consolidator'

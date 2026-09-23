@@ -14,8 +14,18 @@ SCHEMA = {'nodes': ['gid', 'depth', 'is_seed'],
           'transactions': ['src', 'dst', 'date', 'sum_kzt']}
 
 
+def resolve_data_dir(data_dir):
+    """Найти полный набор parquet непосредственно в папке или внутри data/."""
+    root = Path(data_dir)
+    for candidate in (root, root / 'data'):
+        if all((candidate / f'{name}.parquet').is_file() for name in SCHEMA):
+            return candidate
+    raise FileNotFoundError(f'Не найден полный набор nodes/edges/transactions.parquet в {root} или {root / "data"}')
+
+
 def load(data_dir):
     """Прочитать канонические файлы; неоднозначные названия колонок не угадываются."""
+    data_dir = resolve_data_dir(data_dir)
     tables = {}
     for name, required in SCHEMA.items():
         table = pd.read_parquet(Path(data_dir) / f'{name}.parquet')
@@ -37,6 +47,8 @@ def _integrity(nodes, edges, tx):
     for name, table in [('nodes', nodes), ('edges', edges), ('transactions', tx)]:
         missing = sorted(set(SCHEMA[name]) - set(table.columns))
         rows.append({'check': f'{name}: отсутствующие колонки', 'expected': [], 'actual': missing, 'ok': not missing})
+        duplicate = table.columns[table.columns.duplicated()].tolist()
+        rows.append({'check': f'{name}: повторные колонки', 'expected': [], 'actual': duplicate, 'ok': not duplicate})
     if not all(row['ok'] for row in rows):
         return rows
     facts = {'дубликаты gid': int(nodes.gid.duplicated().sum()),
@@ -44,10 +56,20 @@ def _integrity(nodes, edges, tx):
              'неизвестные концы рёбер': len((set(edges.src) | set(edges.dst)) - set(nodes.gid)),
              'неизвестные концы транзакций': len((set(tx.src) | set(tx.dst)) - set(nodes.gid)),
              'невалидные даты': int(pd.to_datetime(tx.date, errors='coerce', utc=True).isna().sum())}
+    facts['nodes.is_seed: невалидные значения'] = int((nodes.is_seed.isna() | ~nodes.is_seed.isin([True, False, 0, 1])).sum())
     for name, series in [('edges.sum_kzt', edges.sum_kzt), ('edges.n_tx', edges.n_tx),
-                          ('transactions.sum_kzt', tx.sum_kzt)]:
+                          ('transactions.sum_kzt', tx.sum_kzt), ('nodes.depth', nodes.depth),
+                          ('edges.depth', edges.depth)]:
+        if len(series) and (not pd.api.types.is_numeric_dtype(series.dtype)
+                            or pd.api.types.is_bool_dtype(series.dtype)
+                            or pd.api.types.is_complex_dtype(series.dtype)):
+            facts[f'{name}: нечисловой тип'] = len(series)
+            continue
         numeric = pd.to_numeric(series, errors='coerce')
-        facts[f'{name}: невалидные значения'] = int((numeric.isna() | ~np.isfinite(numeric) | (numeric < 0)).sum())
+        invalid = numeric.isna() | ~np.isfinite(numeric) | (numeric < 0)
+        if name.endswith(('.depth', '.n_tx')):
+            invalid |= numeric.mod(1).ne(0)
+        facts[f'{name}: невалидные значения'] = int(invalid.sum())
     rows.extend({'check': key, 'expected': 0, 'actual': value, 'ok': value == 0} for key, value in facts.items())
     return rows
 

@@ -55,7 +55,7 @@ def assign_roles(F, clusters, G, cfg):
 
     k = c['distributor']
     even_out = (F.eff_receivers / outdeg.where(outdeg > 0)).fillna(0)
-    candidates['distributor'] = outdeg >= k['min_out_deg']
+    candidates['distributor'] = ~frontier & (outdeg >= k['min_out_deg'])
     scores['distributor'] = 0.7 * ramp(outdeg, *k['ramp_out_deg']) + 0.3 * ramp(even_out, *k['ramp_evenness'])
 
     k = c['transit']
@@ -92,7 +92,7 @@ def assign_roles(F, clusters, G, cfg):
     # An all-zero centrality distribution supplies no bridge evidence.
     bridge = (between > 0) & (between >= between_cut)
     d = (touched >= k['min_clusters_touched']) | bridge
-    candidates['coordinator'] = (a.astype(int) + b.astype(int) + d.astype(int)) >= k['min_signals']
+    candidates['coordinator'] = ~frontier & ((a.astype(int) + b.astype(int) + d.astype(int)) >= k['min_signals'])
     bridge_score = pd.concat([pct(between).where(between > 0, 0), (touched.fillna(0) / 4).clip(0, 1)], axis=1).max(axis=1)
     scores['coordinator'] = (pct(sources).where(sources > 0, 0) + (neighbors / 4).clip(0, 1) + bridge_score) / 3
     role = base.where(~candidates['coordinator'], 'coordinator')

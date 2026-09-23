@@ -1,6 +1,6 @@
 seed: 42
 features: {frontier_depth: 4, fast_pass_days: 2, pagerank_max_iter: 1000, betweenness_k: null}
-attribution: {max_iter: 200, tol_kzt: 0.000001, min_source_kzt: 10000, min_source_share: 0.01}
+attribution: {max_iter: 1000, tol_kzt: 0.000001, min_source_kzt: 10000, min_source_share: 0.01}
 clusters: {resolution: 1.0, stability_runs: 20}
 layout: {iterations: 50, scale: 1500}
 roles:

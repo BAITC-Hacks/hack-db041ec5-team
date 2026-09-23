@@ -154,3 +154,23 @@ def test_microsecond_dates_match_nanosecond_dates(network):
     tx['date'] = pd.to_datetime(tx.date).dt.as_unit('us')
     actual = compute_features(G, nodes, edges, tx, cfg)
     pd.testing.assert_frame_equal(expected, actual)
+
+
+def test_nested_archive_layout_loads(network, tmp_path):
+    nodes, edges, tx, _ = network
+    nested = tmp_path / 'data'
+    nested.mkdir()
+    for name, frame in [('nodes', nodes), ('edges', edges), ('transactions', tx)]:
+        frame.to_parquet(nested / f'{name}.parquet')
+    pd.testing.assert_frame_equal(load(tmp_path)[0], nodes)
+
+
+def test_graph_json_preserves_large_gid():
+    ids = [2 ** 53, 2 ** 53 + 1]
+    nodes = pd.DataFrame({'gid': ids, 'depth': [0, 1], 'is_seed': [True, False]})
+    edges = pd.DataFrame({'src': [ids[0]], 'dst': [ids[1]], 'sum_kzt': [100], 'n_tx': [1]})
+    G = build_graph(nodes, edges)
+    payload = build_graph_json(G, {}, nodes.set_index('gid'))
+    assert [node['id'] for node in payload['nodes']] == list(map(str, ids))
+    assert payload['edges'][0]['source'] == str(ids[0])
+    assert payload['edges'][0]['target'] == str(ids[1])

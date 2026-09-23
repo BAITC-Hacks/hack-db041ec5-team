@@ -46,10 +46,10 @@ def build_graph_json(G, pos, F, R=None, P=None, clusters=None):
         role = R.at[gid, 'role'] if R is not None and gid in R.index else 'peripheral'
         priority = P.at[gid, 'priority_score'] if P is not None and gid in P.index else 0
         group = clusters.get(gid, 0) if clusters is not None else 0
-        nodes.append({'id': _scalar(gid), 'label': str(gid), 'x': float(point[0]),
+        nodes.append({'id': str(gid), 'label': str(gid), 'x': float(point[0]),
                       'y': float(point[1]), 'role': _scalar(role, 'peripheral'),
                       'priority': _scalar(priority, 0), 'cluster': _scalar(group, 0),
                       'is_seed': bool(F.at[gid, 'is_seed']), 'depth': _scalar(F.at[gid, 'depth'])})
-    edges = [{'source': _scalar(u), 'target': _scalar(v), 'sum_kzt': float(d['sum_kzt']),
+    edges = [{'source': str(u), 'target': str(v), 'sum_kzt': float(d['sum_kzt']),
               'n_tx': _scalar(d['n_tx'])} for u, v, d in G.edges(data=True)]
     return {'nodes': nodes, 'edges': edges}

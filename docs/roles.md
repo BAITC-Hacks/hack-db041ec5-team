@@ -12,7 +12,7 @@ ramp(x,lo,hi)=clip((x-lo)/(hi-lo),0,1). Отсутствующие дополн�
 
 - consolidator: in_deg≥5. 0,5 ramp(in_deg,4,12) + 0,3 ramp(seed_sources,1,5)
   + 0,2 ramp(eff_payers/in_deg,0.3,0.8). Для frontier ×0,8.
-- distributor: out_deg≥10. 0,7 ramp(out_deg,8,40)
+- distributor: не frontier, out_deg≥10. 0,7 ramp(out_deg,8,40)
   + 0,3 ramp(eff_receivers/out_deg,0.3,0.8).
 - transit: не frontier; in_deg≤3, out_deg≤3, out_sum>0; seed либо
   pass∈[0,8;1,2]. Балл 0,6 clip(1−abs(pass−1)/0,2,0,1) + 0,4 fast_pass_share.
@@ -21,7 +21,7 @@ ramp(x,lo,hi)=clip((x-lo)/(hi-lo),0,1). Отсутствующие дополн�
   out_sum=0 либо не-seed pass≤0,2. Балл 0,6 clip(1−pass/0,2,0,1)
   + 0,4 ramp(log1p(in_sum),log1p(P50),log1p(P95)). При out_sum=0 pass=0,
   включая seed. Если P50=P95, ramp равен 0 на пороге и 1 выше него.
-- coordinator: ≥2 сигналов: seed_sources≥max(P95,3); ≥2 входящих от
+- coordinator: не frontier, ≥2 сигналов: seed_sources≥max(P95,3); ≥2 входящих от
   consolidator/transit или ≥2 исходящих к consolidator/distributor;
   n_clusters_touched≥3 или положительная betweenness≥P99. Берём только базовые
   роли соседей. Балл — среднее percentile(seed_sources), min(1,role_nb/4),
@@ -56,9 +56,10 @@ ramp(x,lo,hi)=clip((x-lo)/(hi-lo),0,1). Отсутствующие дополн�
 
 ## Реальные данные: осталось выполнить
 
-Parquet-файлы организаторов не предоставлены. Калибровка, ручная проверка
-5 случайных + 3 лучших узлов каждой роли, реальные demo-gid и время на 2 248
-узлах не заявляются выполненными. Тест реальных CSV включится при наличии data/.
+Parquet-файлы организаторов получены, первый полный запуск на 2 248 узлах
+занял 63,77 с. Проверены заполненность выгрузок и граничные узлы. Экспертная
+калибровка и ручная проверка 5 случайных + 3 лучших узлов каждой роли
+остаются отдельным шагом. Подробности — real_data_review.md.
 
 После прогона изучите node_features.csv: распределения степеней, pass_ratio,
 seed_sources и ролей. Для каждой роли выберите min(5,n) строк с random_state=42

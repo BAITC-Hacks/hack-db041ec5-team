@@ -2,12 +2,14 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import warnings
 
 import pandas as pd
 import pytest
 import yaml
 
 from moneygraph.export import SCHEMAS
+from moneygraph.io import resolve_data_dir, load
 from moneygraph.roles import ROLES
 from run import run_pipeline
 
@@ -34,6 +36,9 @@ def check_outputs(out, expected):
     assert P.priority_score.equals(P.gid.map(node_priority).rename('priority_score'))
     graph = json.loads((out / 'graph.json').read_text(encoding='utf-8'))
     assert len(graph['nodes']) == expected
+    ids = {node['id'] for node in graph['nodes']}
+    assert ids == set(R.gid.astype(str))
+    assert all(edge['source'] in ids and edge['target'] in ids for edge in graph['edges'])
     report = json.loads((out / 'run_report.json').read_text(encoding='utf-8'))
     assert report['status'] == 'ok' and report['elapsed_seconds'] > 0
     assert 0 <= report['priority_stability']['mean_jaccard'] <= 1
@@ -58,16 +63,46 @@ def test_end_to_end(tmp_path, sample_network, cfg):
 @pytest.fixture(scope='session')
 def real_output(tmp_path_factory):
     root = Path(__file__).resolve().parents[1]
-    data = root / 'data'
-    if not all((data / f'{name}.parquet').exists() for name in ['nodes', 'edges', 'transactions']):
+    try:
+        data = resolve_data_dir(root / 'data')
+    except FileNotFoundError:
         pytest.skip('Реальные parquet-файлы организаторов отсутствуют')
     out = tmp_path_factory.mktemp('real-output')
-    run_pipeline(data, out, root / 'config.yaml')
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        run_pipeline(data, out, root / 'config.yaml')
     return out
 
 
 def test_real_outputs(real_output):
     check_outputs(real_output, 2248)
+    report = json.loads((real_output / 'run_report.json').read_text(encoding='utf-8'))
+    assert report['elapsed_seconds'] < 300
+    assert report['attribution']['converged']
+    F = pd.read_csv(real_output / 'node_features.csv')
+    assert F.loc[F.is_frontier, 'role'].isin(['consolidator', 'peripheral']).all()
+    assert F.loc[F.is_seed, 'pass_ratio'].isna().all()
+    assert F.loc[(F.in_deg + F.out_deg) == 0, 'cluster_id'].eq(0).all()
+
+
+def test_real_metrics_match_organizer_starter(real_output):
+    import importlib.util
+    import numpy as np
+    root = Path(__file__).resolve().parents[1]
+    starter = root / 'starter' / 'starter' / 'starter.py'
+    if not starter.exists():
+        pytest.skip('Starter организаторов отсутствует')
+    spec = importlib.util.spec_from_file_location('organizer_starter', starter)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    nodes, edges, _ = load(root / 'data')
+    baseline = module.basic_features(module.build_graph(edges), nodes).set_index('gid')
+    actual = pd.read_csv(real_output / 'node_features.csv').set_index('gid').loc[baseline.index]
+    for ours, theirs in [('in_sum', 'in_kzt'), ('out_sum', 'out_kzt'),
+                         ('in_deg', 'in_deg'), ('out_deg', 'out_deg'), ('in_tx', 'in_tx'), ('out_tx', 'out_tx')]:
+        np.testing.assert_allclose(actual[ours], baseline[theirs], atol=1e-7)
+    np.testing.assert_array_equal(actual.is_frontier, baseline.truncated_by_depth)
+    assert actual.index.equals(baseline.index)
 
 
 def test_failed_core_is_reported(tmp_path):

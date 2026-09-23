@@ -10,6 +10,7 @@ from moneygraph.features import structural_features
 from moneygraph.flow import attribute_sources
 from moneygraph.io import validate
 from moneygraph.prepare import prepare
+from run import run_pipeline
 
 
 def test_attribution_against_linear_system():
@@ -66,6 +67,12 @@ def test_representative_size_pipeline(tmp_path):
     edges = pd.DataFrame(sorted(pairs), columns=['src', 'dst'])
     edges['sum_kzt'], edges['n_tx'], edges['depth'] = 10000.0, 1, 1
     tx = edges[['src', 'dst', 'sum_kzt']].assign(date='2026-07-01')
+    # Match the task's transaction count while retaining identical edge totals.
+    split = tx.iloc[:1721].copy()
+    split['sum_kzt'] /= 2
+    tx.loc[:1720, 'sum_kzt'] /= 2
+    tx = pd.concat([tx, split], ignore_index=True)
+    edges.loc[:1720, 'n_tx'] = 2
     nodes = pd.DataFrame({'gid': range(n), 'depth': np.where(np.arange(n) < 81, 0, 2),
                           'is_seed': np.arange(n) < 81})
     for name, frame in [('nodes', nodes), ('edges', edges), ('transactions', tx)]:
@@ -73,7 +80,11 @@ def test_representative_size_pipeline(tmp_path):
     start = perf_counter()
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', UserWarning)
-        report = prepare(tmp_path, tmp_path / 'out')
-    print(f'\nSynthetic 2248 nodes / 3119 edges: {perf_counter() - start:.2f}s')
+        report = run_pipeline(tmp_path, tmp_path / 'out')
+    print(f'\nFull A/B: synthetic 2248 nodes / 3119 edges / 4840 tx: {perf_counter() - start:.2f}s')
+    assert report['status'] == 'ok'
+    assert len(pd.read_csv(tmp_path / 'out' / 'nodes_roles.csv')) == n
+    assert len(pd.read_csv(tmp_path / 'out' / 'top_nodes.csv')) == 50
+    assert len(pd.read_csv(tmp_path / 'out' / 'resilience.csv')) == 12
     assert report['attribution']['converged']
     assert report['attribution']['unattributed_kzt'] < 0.1

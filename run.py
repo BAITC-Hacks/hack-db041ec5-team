@@ -42,7 +42,8 @@ def analyze(nodes, edges, tx, cfg, timings=None):
     ensure_valid_data(nodes, edges, tx)
     if nodes.empty:
         raise ValueError('В nodes нет узлов для анализа')
-    if not pd.api.types.is_integer_dtype(nodes.gid.dtype):
+    if (not pd.api.types.is_integer_dtype(nodes.gid.dtype)
+            or any(int(gid) < -(2 ** 63) or int(gid) > 2 ** 63 - 1 for gid in nodes.gid)):
         raise ValueError('Для итоговых CSV gid должны быть целыми идентификаторами int64')
     with stage('graph', t):
         G = build_graph(nodes, edges)
@@ -71,14 +72,21 @@ def analyze(nodes, edges, tx, cfg, timings=None):
 
 def run_pipeline(data_dir='data', out_dir='output', config_path='config.yaml'):
     started, timings = perf_counter(), {}
-    config_bytes = Path(config_path).read_bytes()
-    cfg = yaml.safe_load(config_bytes)
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    report = {'status': 'running', 'config_sha1': hashlib.sha1(config_bytes).hexdigest(),
-              'config': cfg, 'python': platform.python_version(),
-              'versions': {p: version(p) for p in ['pandas', 'numpy', 'scipy', 'networkx', 'pyarrow', 'PyYAML']}}
+    report = {'status': 'running', 'python': platform.python_version()}
     try:
+        with stage('config', timings):
+            config_bytes = Path(config_path).read_bytes()
+            report['config_sha1'] = hashlib.sha1(config_bytes).hexdigest()
+            cfg = yaml.safe_load(config_bytes)
+            if not isinstance(cfg, dict):
+                raise ValueError('Конфигурация должна быть непустым YAML-словарём')
+            # Reject non-finite or non-JSON values before storing the config in
+            # the report, so error reporting cannot mask the original failure.
+            json.dumps(cfg, allow_nan=False)
+            report['config'] = cfg
+            report['versions'] = {p: version(p) for p in ['pandas', 'numpy', 'scipy', 'networkx', 'pyarrow', 'PyYAML']}
         with stage('load', timings):
             nodes, edges, tx = load(Path(data_dir))
         with stage('validate', timings):
@@ -122,7 +130,7 @@ def main():
     args = parser.parse_args()
     try:
         report = run_pipeline(args.data, args.out, args.config)
-    except (ValueError, KeyError, FileNotFoundError) as exc:
+    except (ValueError, KeyError, FileNotFoundError, yaml.YAMLError) as exc:
         parser.exit(1, f'Pipeline failed: {exc}\n')
     print(f'OK: {report["n_nodes"]} nodes, {report["elapsed_seconds"]:.2f} s')
 
