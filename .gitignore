@@ -4,3 +4,11 @@ __pycache__/
 output/
 data/
 .uv-cache/
+.env
+.env.*
+!.env.example
+incoming/
+.venv-clean/
+wheelhouse/
+dist/
+*.log

@@ -1,0 +1,14 @@
+# Unified A/B/C dependencies. Exact tested versions: requirements-lock.txt.
+pandas>=2.3,<3
+numpy>=2.3,<3
+scipy>=1.16,<2
+networkx>=3.5,<4
+pyarrow>=23,<26
+PyYAML>=6,<7
+streamlit>=1.50,<2
+pyvis==0.3.2
+openai>=2,<4
+python-dotenv>=1,<2
+altair>=5,<7
+jsonschema>=4,<5
+pytest>=9,<10
