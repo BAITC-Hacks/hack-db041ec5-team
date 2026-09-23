@@ -116,10 +116,12 @@ def _dataset_checks(nodes, edges, tx):
     return facts
 
 
-def validate(nodes, edges, tx):
+def validate(nodes, edges, tx, profile='organizer'):
     """Вернуть список check/expected/actual/ok; расхождения сообщать warnings.warn."""
     checks = _integrity(nodes, edges, tx)
-    if all(row['ok'] for row in checks):
+    if profile not in ('organizer', 'generic'):
+        raise ValueError('Профиль данных должен быть organizer или generic')
+    if all(row['ok'] for row in checks) and profile == 'organizer':
         checks.extend(_dataset_checks(nodes, edges, tx))
     for row in checks:
         if not row['ok']:

@@ -7,7 +7,7 @@ from html import escape
 import altair as alt
 import pandas as pd
 import streamlit as st
-from assistant.agent import brief
+from assistant.fallback import node_brief
 from assistant.tools import get_node
 
 from ui.constants import METRIC_LABELS, ROLE_COLORS, ROLE_LABELS, fmt_number
@@ -35,6 +35,7 @@ def _counterparty_table(rows):
         st.caption("В выборке не найдены.")
         return
     df = pd.DataFrame(rows)
+    df['gid'] = df.gid.astype(str)
     df["role"] = df.role.map(lambda r: ROLE_LABELS.get(r, "Нет роли"))
     st.dataframe(
         df[["gid", "role", "sum_kzt", "n_tx"]].rename(
@@ -164,19 +165,20 @@ def show_node_card(ctx, gid, *, key="card", model="", online=False):
         st.caption(
             "Нет операций для этого gid или ещё не загружен data/transactions.parquet."
         )
-    cache_key = f"{ctx.fingerprint}:{gid}:{model}:{online}"
-    if st.button("AI-справка", key=f"{key}_brief_{gid}", type="secondary"):
-        cached = st.session_state.setdefault("briefs", {}).get(cache_key)
-        # Успешную справку переиспользуем; после сбоя API кнопка позволяет повторить запрос.
-        if cached is None or (online and cached["mode"] != "онлайн"):
-            with st.spinner("Готовлю справку…"):
-                answer = brief(ctx, gid, model, online=online)
-            st.session_state["briefs"][cache_key] = asdict(answer)
-    saved = st.session_state.get("briefs", {}).get(cache_key)
+    with st.expander("Краткая справка по данным"):
+        st.write(node_brief(record))
+        st.download_button("Скачать справку", node_brief(record).encode("utf-8"),
+                           file_name=f"node_{gid}.txt", key=f"{key}_download_{gid}")
+    if st.button('AI-справка', key=f'{key}_brief_{gid}'):
+        from assistant.agent import brief
+        with st.spinner('Готовлю справку по текущим данным…'):
+            answer = brief(ctx, gid, model, online=online)
+        st.session_state.setdefault('briefs', {})[f'{ctx.fingerprint}:{gid}:{model}:{online}'] = asdict(answer)
+    saved = st.session_state.get('briefs', {}).get(f'{ctx.fingerprint}:{gid}:{model}:{online}')
     if saved:
-        st.caption("Справка · " + saved["mode"])
-        if saved["notice"]:
-            st.info(saved["notice"])
-        st.write(saved["text"])
-        with st.expander("Данные для справки"):
-            st.json(saved["calls"])
+        st.caption('Справка · ' + saved['mode'])
+        st.write(saved['text'])
+        if saved['notice']:
+            st.info(saved['notice'])
+        with st.expander('Данные для AI-справки'):
+            st.json(saved['calls'])

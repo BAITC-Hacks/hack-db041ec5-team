@@ -5,12 +5,13 @@ from pathlib import Path
 
 import streamlit as st
 from dotenv import load_dotenv
-from assistant.agent import api_key, provider_name
+from assistant import agent
 from ui.constants import ROLE_LABELS
 from ui.data import file_signature, load_context
 from ui.demo import make_demo
 from ui.pages import (
     assistant_page,
+    patterns_page,
     clusters_page,
     gaps_page,
     graph_page,
@@ -19,12 +20,15 @@ from ui.pages import (
     resilience_page,
 )
 from ui.style import apply_style
+from ui.uploads import analysis_controls
 
 ROOT = Path(__file__).resolve().parent
+load_dotenv(ROOT / '.env', override=False)
 DEFAULT_OUTPUT = ROOT / 'output'
+if (DEFAULT_OUTPUT / 'current' / 'nodes_roles.csv').is_file():
+    DEFAULT_OUTPUT = DEFAULT_OUTPUT / 'current'
 if not (DEFAULT_OUTPUT / 'nodes_roles.csv').is_file() and (DEFAULT_OUTPUT / 'real' / 'nodes_roles.csv').is_file():
     DEFAULT_OUTPUT = DEFAULT_OUTPUT / 'real'
-load_dotenv(ROOT / ".env", override=False)
 st.set_page_config(
     page_title="Граф денег · Аналитика сети", page_icon="◉", layout="wide"
 )
@@ -52,10 +56,13 @@ with st.sidebar:
         data_dir = st.text_input(
             "Папка data", value=os.getenv("MONEYGRAPH_DATA_DIR", str(ROOT / "data"))
         )
-        cfg_path = st.text_input("Конфигурация B", value=str(ROOT / "config.yaml"))
+        cfg_path = st.text_input("Конфигурация", value=str(ROOT / "config.yaml"))
         if st.button("Обновить данные", width="stretch"):
             cached_context.clear()
     st.divider()
+
+if not demo:
+    out_dir, data_dir, cfg_path = analysis_controls(ROOT, out_dir, data_dir, cfg_path)
 
 ctx = (
     make_demo()
@@ -101,26 +108,15 @@ with st.sidebar:
     )
     show_all = st.checkbox("Весь граф · без порога")
     st.divider()
-    st.markdown("**Ассистент**")
-    model = st.text_input(
-        "Модель LLM",
-        value=os.getenv("MONEYGRAPH_LLM_MODEL", ""),
-        placeholder="Модель с function calling",
-    )
-    configured = bool(api_key()) and bool(model.strip())
-    st.caption('Провайдер: ' + provider_name().upper())
-    online = st.toggle(
-        "Использовать онлайн-режим", value=False, disabled=not configured
-    )
-    if not configured:
-        st.caption(
-            "Офлайн работает сразу. Для онлайн укажи ключ в .env и доступную модель."
-        )
+    st.markdown('**ИИ-помощник**')
+    model = st.text_input('Модель OpenAI', value=os.getenv('MONEYGRAPH_LLM_MODEL', 'gpt-4.1-mini'), key='llm_model')
+    configured = bool(agent.api_key()) and bool(model.strip())
+    online = st.toggle('Использовать онлайн-режим', value=False, disabled=not configured, key='llm_online')
+    if configured:
+        st.caption('Ключ настроен на сервере. Провайдер: ' + agent.provider_name())
     else:
-        st.caption(
-            "Онлайн передаёт вопрос, последние сообщения и результаты инструментов выбранному API-провайдеру."
-        )
-    st.caption("Граф и расчёты доступны без интернета.")
+        st.caption('Добавьте OPENAI_API_KEY в .env рядом с app.py и перезапустите START.cmd. Без ключа помощник отвечает офлайн.')
+    st.caption('Онлайн передаёт вопрос и результаты инструментов API-провайдеру. Основной расчёт остаётся локальным.')
 
 st.markdown('''<div class="workspace-hero"><div><div class="eyebrow">MONEY GRAPH / ANALYTICS WORKSPACE</div><h1>Каждый перевод — часть картины</h1><p>Исследуйте связи, находите приоритеты и проверяйте гипотезы.</p></div><div class="status-pill">● Локальная аналитика</div></div>''', unsafe_allow_html=True)
 if demo:
@@ -133,7 +129,7 @@ if ctx.missing or ctx.warnings:
             st.warning(warning)
 if not ctx.graph:
     st.info(
-        "Положи результаты A/B в output/ или включи «Демонстрационный пример» слева, чтобы проверить все экраны."
+        "Загрузите три файла в блоке анализа выше или включите демонстрационный пример слева."
     )
 
 filters = dict(
@@ -151,6 +147,7 @@ tabs = st.tabs(
         "Кластеры",
         "Устойчивость",
         "Белые пятна",
+        "Паттерны",
         "Ассистент",
     ]
 )
@@ -167,10 +164,10 @@ with tabs[4]:
 with tabs[5]:
     gaps_page(ctx)
 with tabs[6]:
+    patterns_page(ctx)
+with tabs[7]:
     assistant_page(ctx, model.strip(), online)
-st.caption(
-    "Выборка ограничена исходящими переводами, четырьмя коленами и порогом суммы. Роли — гипотезы для проверки."
-)
+st.caption('Роли — гипотезы для проверки. Анализ учитывает только загруженные переводы и указанную границу выборки.')
 
 
 

@@ -6,7 +6,6 @@ from html import escape
 import altair as alt
 import pandas as pd
 import streamlit as st
-from assistant.agent import ask
 from assistant.tools import top_nodes
 
 from ui.constants import ROLE_COLORS, ROLE_LABELS, fmt_kzt, fmt_number
@@ -17,13 +16,15 @@ from ui.dashboard import network_health, transactions_dashboard
 
 def role_table(df, **kwargs):
     display = df.copy()
+    if 'gid' in display:
+        display['gid'] = display.gid.astype(str)
     if 'role' in display:
         display['role'] = display.role.map(lambda value: ROLE_LABELS.get(value, value))
     colors = {ROLE_LABELS.get(role, role): color for role, color in ROLE_COLORS.items()}
     def role_style(value):
         return f"color: {colors.get(value, '#526375')}; font-weight: 600"
     styled = display.style.map(role_style, subset=['role']) if 'role' in display else display
-    config = {'gid': st.column_config.NumberColumn('ID клиента', format='%d'),
+    config = {'gid': st.column_config.TextColumn('ID клиента'),
               'role': 'Роль', 'rank': 'Место', 'priority_score': st.column_config.ProgressColumn('Приоритет', min_value=0, max_value=1, format='%.2f'),
               'why': 'Почему в приоритете'}
     return st.dataframe(styled, hide_index=True, width='stretch', column_config=config, **kwargs)
@@ -70,7 +71,7 @@ def overview(ctx):
     st.caption('Приоритеты и роли — результаты расчётного модуля. Они помогают выбрать направление проверки.')
 
 
-def graph_page(ctx, filters, model, online):
+def graph_page(ctx, filters, model='', online=False):
     st.subheader("Куда движутся деньги")
     left, right = st.columns([3, 1])
     query = left.text_input(
@@ -91,14 +92,15 @@ def graph_page(ctx, filters, model, online):
             "Поиск показывает окружение узла независимо от боковых фильтров. Направления рёбер сохранены."
         )
     nodes, edges = graph_records(ctx, highlight=highlight, hops=hops, **filters)
-    render_graph(nodes, edges, highlight=highlight, edge_labels=highlight is not None)
+    labels = st.checkbox('Показывать суммы на рёбрах', value=False, key='edge_labels')
+    render_graph(nodes, edges, highlight=highlight, edge_labels=labels)
     legend(ctx, filters["color_by"])
     if highlight is not None:
         st.divider()
         show_node_card(ctx, highlight, key="graph", model=model, online=online)
 
 
-def priorities(ctx, model, online):
+def priorities(ctx, model='', online=False):
     st.subheader("Кого проверить первым")
     data = ctx.frames["top_nodes"].copy()
     if data.empty:
@@ -215,7 +217,27 @@ def gaps_page(ctx):
     )
 
 
+def patterns_page(ctx):
+    st.subheader('Повторяющиеся цепочки и платежи')
+    st.caption('Сигналы для проверки: совпадение по времени не доказывает движение одних и тех же денег. Переводы, отсутствующие в файлах, не анализируются.')
+    for name, title in [('repeated_routes', 'Повторяющиеся цепочки A → B → C'),
+                        ('splitting', 'Возможное дробление сумм'), ('cycles', 'Возвратные маршруты')]:
+        st.markdown(f'**{title}**')
+        data = ctx.frames.get(name, pd.DataFrame()).copy()
+        if data.empty:
+            st.info('Совпадений нет или эти результаты ещё не рассчитаны. Запустите новый анализ.')
+            continue
+        for col in ('src', 'via', 'dst'):
+            if col in data:
+                data[col] = data[col].astype(str)
+        st.dataframe(data, hide_index=True, width='stretch')
+        st.download_button('Скачать ' + title.lower(), data.to_csv(index=False).encode('utf-8-sig'),
+                           file_name=name + '.csv', key='download_' + name)
+    st.caption('Поиск цепочек ограничен числом пар из config.yaml; признак достижения лимита записан в run_report.json → routes_search. Полного поиска на произвольном объёме не гарантируется.')
+
+
 def assistant_page(ctx, model, online):
+    from assistant.agent import ask
     st.subheader("Спроси о связях и потоках")
     st.caption(
         "Режим: "

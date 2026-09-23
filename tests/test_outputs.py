@@ -129,7 +129,7 @@ def test_real_streamlit_search(real_output, monkeypatch):
     monkeypatch.setenv('MONEYGRAPH_DEMO', '0')
     gid = str(pd.read_csv(real_output / 'top_nodes.csv').iloc[0].gid)
     app = AppTest.from_file(str(root / 'app.py'), default_timeout=60).run()
-    assert not app.exception and len(app.tabs) == 7
+    assert not app.exception and len(app.tabs) == 8
     app.text_input(key='gid_query').set_value(gid).run()
     assert not app.exception
     assert any(f'gid {gid}' in item.value for item in app.markdown)

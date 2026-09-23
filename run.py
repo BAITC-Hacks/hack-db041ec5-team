@@ -20,7 +20,7 @@ from moneygraph.gaps import next_requests
 from moneygraph.graph import build_graph
 from moneygraph.hypotheses import summarize_clusters
 from moneygraph.io import ensure_valid_data, load, validate, write_quality_report
-from moneygraph.patterns import detect_patterns
+from moneygraph.patterns import detect_patterns, transaction_patterns
 from moneygraph.priority import prioritize
 from moneygraph.resilience import compare_strategies
 from moneygraph.roles import assign_roles
@@ -90,7 +90,11 @@ def run_pipeline(data_dir='data', out_dir='output', config_path='config.yaml'):
         with stage('load', timings):
             nodes, edges, tx = load(Path(data_dir))
         with stage('validate', timings):
-            checks = validate(nodes, edges, tx)
+            if cfg.get('dataset_profile') == 'generic':
+                from moneygraph.uploads import check_consistency
+                ensure_valid_data(nodes, edges, tx)
+                check_consistency(edges, tx)
+            checks = validate(nodes, edges, tx, profile=cfg.get('dataset_profile', 'organizer'))
             write_quality_report(checks, out)
         F, R, P, C, G = analyze(nodes, edges, tx, cfg, timings)
         extras = {}
@@ -99,7 +103,9 @@ def run_pipeline(data_dir='data', out_dir='output', config_path='config.yaml'):
         if cfg['extras']['patterns']:
             with stage('patterns', timings):
                 F, extras['cycles'] = detect_patterns(G, F, cfg)
+                extras.update(transaction_patterns(tx, cfg))
             report['cycles_truncated'] = extras['cycles'].attrs.get('truncated', False)
+            report['routes_search'] = extras['repeated_routes'].attrs.copy()
         if cfg['extras']['cluster_stability']:
             with stage('cluster_stability', timings):
                 stable = cluster_stability(G, F.cluster_id, cfg)

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Граф денег</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+    <link rel="stylesheet" href="/assets/vendor/vis-network.css" />
+    <script defer src="/assets/vendor/vis-network.min.js"></script>
+    <script defer src="/assets/app.js"></script>
+  </head>
+  <body>
+    <aside>
+      <div class="brand">↗ Money Graph</div>
+      <p>Рабочее место аналитика</p>
+      <p id="connection" role="status">Проверка подключения…</p>
+    </aside>
+    <main>
+      <header>
+        <span>MONEY GRAPH / АНАЛИТИКА СЕТИ</span>
+        <h1>Финансовая структура сети</h1>
+        <p>Связи, роли и приоритеты проверки — в одном пространстве.</p>
+      </header>
+      <section class="panel data-panel">
+        <h2>Данные анализа</h2>
+        <p>
+          Конкурсный набор · 2 248 участников · июль 2026. При открытии
+          показывается сохранённый результат расчёта.
+        </p>
+        <div class="row">
+          <button id="restore">Открыть конкурсный набор</button
+          ><button id="recalculate">Пересчитать конкурсный набор</button>
+        </div>
+        <details>
+          <summary>Загрузить другой набор</summary>
+          <p>
+            Три файла: <b>nodes, edges, transactions</b> в формате Parquet или
+            CSV.
+          </p>
+          <form id="upload">
+            <input
+              id="files"
+              type="file"
+              accept=".parquet,.csv"
+              multiple
+              required
+            />
+            <div class="row">
+              <label
+                >Граница выборки<select id="frontier">
+                  <option value="4">4-е колено — данные конкурса</option>
+                  <option value="none">Полная сеть, без обрыва</option>
+                  <option value="1">1-е колено</option>
+                  <option value="2">2-е колено</option>
+                  <option value="3">3-е колено</option>
+                  <option value="5">5-е колено</option>
+                  <option value="6">6-е колено</option>
+                </select></label
+              ><button id="analyze" type="submit">
+                Проанализировать файлы
+              </button>
+            </div>
+          </form>
+          <details>
+            <summary>Формат файлов и ограничения</summary>
+            <pre>
+nodes: gid, depth, is_seed
+edges: src, dst, sum_kzt, n_tx, depth
+transactions: src, dst, date, sum_kzt</pre>
+            <p>
+              CSV: UTF-8, запятая. ID — целые, суммы — KZT, даты — ISO. Рёбра
+              должны соответствовать транзакциям. До 3 МБ файлов, 5 000 узлов и
+              20 000 операций. Для больших наборов используйте START.cmd.
+            </p>
+          </details>
+        </details>
+        <p id="status" role="status" aria-live="polite">
+          Открываю конкурсный набор…
+        </p>
+        <progress id="progress" hidden></progress>
+      </section>
+      <section id="workspace" hidden>
+        <div id="metrics" class="metrics"></div>
+        <nav id="tabs" aria-label="Разделы анализа"></nav>
+        <div class="downloads">
+          <button data-export="moneygraph-results.zip">
+            ↓ Все результаты ZIP
+          </button>
+          <span>Результаты:</span
+          ><button data-export="nodes_roles.csv">Роли CSV</button
+          ><button data-export="clusters.csv">Кластеры CSV</button
+          ><button data-export="top_nodes.csv">Топ CSV</button>
+        </div>
+        <section id="overview" class="view">
+          <div class="dashboard-charts">
+            <article class="panel">
+              <div class="eyebrow">СТРУКТУРА СЕТИ</div>
+              <h2>Роли участников</h2>
+              <div id="role-chart"></div>
+            </article>
+            <article class="panel">
+              <div class="eyebrow">СООБЩЕСТВА</div>
+              <h2>Крупнейшие кластеры</h2>
+              <div id="cluster-chart"></div>
+            </article>
+          </div>
+          <div class="panel">
+            <h2>Кого проверить первым</h2>
+            <p>Выберите клиента в таблице или найдите его на графе.</p>
+            <div id="top-preview"></div>
+            <details>
+              <summary>Качество данных и отчёт</summary>
+              <pre id="quality"></pre>
+            </details>
+          </div>
+        </section>
+        <section id="graph" class="panel view" hidden>
+          <h2>Куда движутся деньги</h2>
+          <form id="search" class="row">
+            <label
+              >Поиск по gid<input
+                id="gid"
+                inputmode="numeric"
+                placeholder="Полный идентификатор клиента" /></label
+            ><button>Найти</button
+            ><button type="button" id="reset-graph">Вся сеть</button
+            ><label
+              >Раскраска<select id="color">
+                <option value="role">По роли</option>
+                <option value="cluster">По кластеру</option>
+              </select></label
+            >
+          </form>
+          <p id="graph-note"></p>
+          <div id="network"></div>
+          <div id="legend"></div>
+          <div id="node"></div>
+        </section>
+        <section id="priorities" class="panel view" hidden>
+          <h2>Приоритеты проверки</h2>
+          <div id="top-table"></div>
+        </section>
+        <section id="clusters" class="panel view" hidden>
+          <h2>Группы и гипотезы</h2>
+          <div id="cluster-table"></div>
+        </section>
+        <section id="patterns" class="panel view" hidden>
+          <h2>Повторяющиеся цепочки и платежи</h2>
+          <p>
+            Временное совпадение не доказывает движение одной и той же суммы.
+            Признаки дробления требуют проверки.
+          </p>
+          <div id="pattern-tables"></div>
+        </section>
+        <section id="resilience" class="panel view" hidden>
+          <h2>Устойчивость сети</h2>
+          <p>
+            Изъятие узлов моделируется, реальной блокировки нет. Приоритет
+            проверки не обязан лучше всего разрушать сеть.
+          </p>
+          <div id="resilience-table"></div>
+        </section>
+        <section id="gaps" class="panel view" hidden>
+          <h2>Каких данных не хватает</h2>
+          <div id="gaps-table"></div>
+        </section>
+        <section id="assistant" class="panel view" hidden>
+          <h2>Помощник по вашим файлам</h2>
+          <p>
+            Например: «Топ 10», «Карточка [gid]», «Кому платил [gid]?». Без
+            OpenAI доступны поддерживаемые запросы по правилам.
+          </p>
+          <div id="chat" aria-live="polite"></div>
+          <form id="chat-form" class="row">
+            <label class="grow"
+              >Вопрос<textarea
+                id="question"
+                maxlength="4000"
+                required
+                rows="3"
+              ></textarea></label
+            ><button id="send">Спросить</button>
+          </form>
+        </section>
+      </section>
+      <footer>
+        Выводы требуют проверки аналитиком. Приложение использует только
+        загруженные данные.
+      </footer>
+    </main>
+  </body>
+</html>

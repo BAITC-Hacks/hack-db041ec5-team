@@ -12,3 +12,6 @@ python-dotenv>=1,<2
 altair>=5,<7
 jsonschema>=4,<5
 pytest>=9,<10
+
+fastapi>=0.115,<1
+itsdangerous>=2.2,<3

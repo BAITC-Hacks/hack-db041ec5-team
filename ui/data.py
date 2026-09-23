@@ -14,6 +14,9 @@ import yaml
 from ui.constants import ROLE_COLORS
 
 SCHEMAS = {
+    "repeated_routes": {"src", "via", "dst", "path", "episodes", "active_days", "evidence"},
+    "splitting": {"src", "dst", "day", "n_tx", "sum_kzt", "evidence"},
+    "cycles": {"cycle_id", "length", "path", "has_seed", "min_edge_kzt"},
     "nodes_roles": {
         "gid",
         "role",
@@ -256,7 +259,8 @@ def assemble(
                 except ValueError:
                     attrs[key] = None
         if attrs.get("depth") is not None and "is_frontier" not in attrs:
-            attrs["is_frontier"] = float(attrs["depth"]) >= 4
+            boundary = ctx.cfg.get('features', {}).get('frontier_depth', 4)
+            attrs["is_frontier"] = boundary is not None and float(attrs["depth"]) >= boundary
     if ctx.graph and any(
         ctx.nodes[g].get("x") is None or ctx.nodes[g].get("y") is None
         for g in ctx.graph

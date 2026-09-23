@@ -23,7 +23,8 @@ def structural_features(nodes, edges, cfg):
         name = 'eff_payers' if side == 'in' else 'eff_receivers'
         F[name] = effective.reindex(F.index).fillna(0)
     F['is_seed'] = F.is_seed.astype(bool)
-    F['is_frontier'] = F.depth >= cfg.get('features', {}).get('frontier_depth', 4)
+    frontier = cfg.get('features', {}).get('frontier_depth', 4)
+    F['is_frontier'] = False if frontier is None else F.depth >= frontier
     F['pass_ratio'] = (F.out_sum / F.in_sum.where(F.in_sum > 0)).where(~F.is_seed & ~F.is_frontier)
     F['ext_inflow'] = (F.out_sum - F.in_sum).clip(lower=0).where(~F.is_seed, 0)
     return F

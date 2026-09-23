@@ -46,6 +46,8 @@ def graph_records(
     )
     labeled = set(ranked[:50])
     nodes = []
+    # Spread a small selected neighbourhood independently of the full-network layout.
+    local = nx.spring_layout(ctx.graph.subgraph(sorted(visible)), seed=42, weight=None, scale=600) if highlight is not None and len(visible) <= 200 else {}
     for gid in sorted(visible):
         n = ctx.nodes[gid]
         role, priority = n.get("role"), n.get("priority_score")
@@ -58,8 +60,8 @@ def graph_records(
         nodes.append(
             dict(
                 id=gid,
-                x=float(n["x"]),
-                y=float(n["y"]),
+                x=float(local[gid][0]) if gid in local else float(n["x"]),
+                y=float(local[gid][1]) if gid in local else float(n["y"]),
                 is_seed=bool(n.get("is_seed")),
                 show_label=gid in labeled or gid == highlight,
                 size=8 + 30 * (priority or 0),

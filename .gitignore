@@ -11,6 +11,10 @@ __MACOSX/
 !.env.example
 incoming/
 .venv-clean/
+.venv-check/
 wheelhouse/
 dist/
 *.log
+.streamlit/secrets.toml
+.vercel/
+.vercel
