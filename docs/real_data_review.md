@@ -1,6 +1,6 @@
 # Проверка данных организаторов и соответствия ТЗ
 
-Проверены data/data/*.parquet, README (2).md, starter/starter/README.md,
+Проверены data/data/*.parquet, docs/DATASET.md, starter/starter/README.md,
 starter/starter/starter.py и исходное ТЗ. Дата: 23.09.2026.
 
 ## Совместимость
