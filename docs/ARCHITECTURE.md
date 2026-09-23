@@ -11,7 +11,7 @@ flowchart LR
   C --> UI[Streamlit: dashboard и семь вкладок]
   UI --> T[Инструменты: карточка, соседи, пути, симуляция]
   T --> OFF[Офлайн маршрутизатор и шаблонные ответы]
-  T --> ON[Опциональный OpenAI API]
+  T --> ON[Опциональный NVIDIA или OpenAI API]
   ON --> OFF
 ```
 

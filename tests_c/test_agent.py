@@ -126,3 +126,36 @@ def test_legacy_token_parameter_retry(ctx):
         "max_tokens" in client.requests[1]
         and "max_completion_tokens" not in client.requests[1]
     )
+
+
+def test_nvidia_uses_compatible_tools_and_token_parameter(ctx, monkeypatch):
+    monkeypatch.setenv('MONEYGRAPH_LLM_PROVIDER', 'nvidia')
+    client = FakeClient([completion(name='get_node', args={'gid': 900}), completion('gid 900: гипотеза.')])
+    result = ask('Карточка 900', ctx, [], 'test-nvidia', client=client)
+    assert result.mode == 'онлайн'
+    assert client.requests[0]['tool_choice'] == 'auto'
+    assert 'max_tokens' in client.requests[0] and 'max_completion_tokens' not in client.requests[0]
+    assert all('strict' not in tool['function'] for tool in client.requests[0]['tools'])
+    from assistant.schemas import TOOL_SCHEMAS
+    assert all(tool['function']['strict'] for tool in TOOL_SCHEMAS)
+
+
+def test_nvidia_key_is_only_sent_to_nvidia_endpoint(monkeypatch):
+    from assistant.agent import _client
+    import openai
+    monkeypatch.setenv('MONEYGRAPH_LLM_PROVIDER', 'nvidia')
+    monkeypatch.setenv('NVIDIA_API_KEY', 'synthetic-nvidia-key')
+    monkeypatch.setenv('OPENAI_API_KEY', 'synthetic-other-key')
+    monkeypatch.delenv('MONEYGRAPH_LLM_BASE_URL', raising=False)
+    captured = {}
+    monkeypatch.setattr(openai, 'OpenAI', lambda **kw: captured.update(kw))
+    _client()
+    assert captured['base_url'] == 'https://integrate.api.nvidia.com/v1'
+    assert captured['api_key'] == 'synthetic-nvidia-key'
+
+
+def test_nvidia_without_tools_falls_back(ctx, monkeypatch):
+    monkeypatch.setenv('MONEYGRAPH_LLM_PROVIDER', 'nvidia')
+    client = FakeClient([completion('Выдуманный ответ')])
+    result = ask('Карточка 900', ctx, [], 'test', client=client)
+    assert result.mode == 'офлайн' and 'Выдуманный' not in result.text

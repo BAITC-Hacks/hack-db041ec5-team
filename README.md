@@ -8,6 +8,8 @@
 ## Веб-приложение и dashboard
 
 Части A/B/C объединены. Запуск, демо и установка без интернета: [RUN_WEB](docs/RUN_WEB.md).
+Подключение NVIDIA API или модели на Brev: [NVIDIA_SETUP](docs/NVIDIA_SETUP.md).
+Приёмочная проверка и сценарий сдачи на реальных данных: [DELIVERY_CHECK](docs/DELIVERY_CHECK.md).
 Схема: [ARCHITECTURE](docs/ARCHITECTURE.md). Проверка объединения с реальными данными: [ABC_INTEGRATION](docs/ABC_INTEGRATION.md).
 
 Быстрый запуск после установки requirements-lock.txt:

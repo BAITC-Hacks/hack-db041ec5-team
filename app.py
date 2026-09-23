@@ -5,6 +5,7 @@ from pathlib import Path
 
 import streamlit as st
 from dotenv import load_dotenv
+from assistant.agent import api_key, provider_name
 from ui.constants import ROLE_LABELS
 from ui.data import file_signature, load_context
 from ui.demo import make_demo
@@ -102,11 +103,12 @@ with st.sidebar:
     st.divider()
     st.markdown("**Ассистент**")
     model = st.text_input(
-        "Модель OpenAI",
+        "Модель LLM",
         value=os.getenv("MONEYGRAPH_LLM_MODEL", ""),
         placeholder="Модель с function calling",
     )
-    configured = bool(os.getenv("OPENAI_API_KEY")) and bool(model.strip())
+    configured = bool(api_key()) and bool(model.strip())
+    st.caption('Провайдер: ' + provider_name().upper())
     online = st.toggle(
         "Использовать онлайн-режим", value=False, disabled=not configured
     )
@@ -116,7 +118,7 @@ with st.sidebar:
         )
     else:
         st.caption(
-            "Онлайн передаёт вопрос, последние сообщения и результаты инструментов в OpenAI API."
+            "Онлайн передаёт вопрос, последние сообщения и результаты инструментов выбранному API-провайдеру."
         )
     st.caption("Граф и расчёты доступны без интернета.")
 

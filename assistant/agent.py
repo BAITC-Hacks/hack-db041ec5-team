@@ -3,6 +3,7 @@
 import json
 import os
 import time
+from copy import deepcopy
 from dataclasses import dataclass, field
 
 from assistant import fallback
@@ -36,16 +37,34 @@ def _offline(question, ctx, notice="", calls=None):
     return Answer(text, "офлайн", (calls or []) + local_calls, notice)
 
 
+def provider_name():
+    return os.getenv('MONEYGRAPH_LLM_PROVIDER', 'openai').strip().lower()
+
+
+def api_key():
+    variable = 'NVIDIA_API_KEY' if provider_name() == 'nvidia' else 'OPENAI_API_KEY'
+    return os.getenv(variable, '').strip()
+
+
 def _client():
     from openai import OpenAI
 
-    return OpenAI(api_key=os.environ["OPENAI_API_KEY"], max_retries=0, timeout=10)
+    provider = provider_name()
+    if provider not in ('openai', 'nvidia'):
+        raise ValueError('MONEYGRAPH_LLM_PROVIDER: ожидается openai или nvidia')
+    default_url = 'https://integrate.api.nvidia.com/v1' if provider == 'nvidia' else 'https://api.openai.com/v1'
+    base_url = os.getenv('MONEYGRAPH_LLM_BASE_URL', '').strip() or default_url
+    return OpenAI(api_key=api_key(), base_url=base_url, max_retries=0, timeout=10)
 
 
 def _completion(client, model, messages, **kwargs):
     """Не задаём temperature: часть моделей его не поддерживает."""
     from openai import BadRequestError
 
+    if provider_name() == 'nvidia':
+        return client.chat.completions.create(
+            model=model, messages=messages, max_tokens=1100, **kwargs
+        )
     try:
         return client.chat.completions.create(
             model=model, messages=messages, max_completion_tokens=1100, **kwargs
@@ -72,7 +91,7 @@ def _reason(exc):
     )
 
     if isinstance(exc, AuthenticationError):
-        return "API-ключ не принят. Проверь OPENAI_API_KEY в .env."
+        return "API-ключ не принят. Проверь ключ выбранного провайдера в .env."
     if isinstance(exc, RateLimitError):
         return "Достигнут лимит API или недоступна квота."
     if isinstance(exc, APIConnectionError):
@@ -94,11 +113,11 @@ def ask(
 ) -> Answer:
     if not online:
         return _offline(question, ctx, "Ответ собран локально без LLM.")
-    if not model or (client is None and not os.getenv("OPENAI_API_KEY")):
+    if not model or (client is None and not api_key()):
         return _offline(
             question,
             ctx,
-            "Онлайн-режим не настроен: нужны OPENAI_API_KEY и MONEYGRAPH_LLM_MODEL. Ответ собран без LLM.",
+            "Онлайн-режим не настроен: нужны ключ выбранного провайдера и MONEYGRAPH_LLM_MODEL. Ответ собран без LLM.",
         )
     from openai import APIError
 
@@ -124,6 +143,11 @@ def ask(
             {"role": "user", "content": question[:4000]},
         ]
         deadline = time.monotonic() + 50
+        tools = deepcopy(TOOL_SCHEMAS)
+        nvidia = provider_name() == 'nvidia'
+        if nvidia:
+            for tool in tools:
+                tool['function'].pop('strict', None)
         for step in range(max(1, min(int(max_steps), 6))):
             if time.monotonic() >= deadline or len(calls) >= 12:
                 break
@@ -131,8 +155,8 @@ def ask(
                 api,
                 model,
                 messages,
-                tools=TOOL_SCHEMAS,
-                tool_choice="required" if step == 0 else "auto",
+                tools=tools,
+                tool_choice="required" if step == 0 and not nvidia else "auto",
                 timeout=max(1, min(10, deadline - time.monotonic())),
             )
             if not response.choices:
@@ -155,7 +179,10 @@ def ask(
                 break
             if len(tool_calls) > 8 or len(calls) + len(tool_calls) > 12:
                 break
-            messages.append(message.model_dump(exclude_none=True))
+            messages.append({'role': 'assistant', 'content': message.content or '',
+                             'tool_calls': [{'id': tc.id, 'type': 'function',
+                              'function': {'name': tc.function.name, 'arguments': tc.function.arguments}}
+                             for tc in tool_calls]})
             for tc in tool_calls:
                 try:
                     args = json.loads(tc.function.arguments)
@@ -210,7 +237,7 @@ def brief(ctx, gid, model, *, online=True, client=None) -> Answer:
         "error" in record
         or not online
         or not model
-        or (client is None and not os.getenv("OPENAI_API_KEY"))
+        or (client is None and not api_key())
     ):
         return Answer(local, "офлайн", trace, "Шаблонная справка без LLM.")
     from openai import APIError

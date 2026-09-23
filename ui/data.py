@@ -111,7 +111,7 @@ class Context:
 def file_signature(out_dir, data_dir, cfg_path):
     data_dir = data_directory(data_dir)
     paths = [Path(out_dir) / f"{name}.csv" for name in SCHEMAS]
-    paths += [Path(out_dir) / "graph.json", Path(cfg_path)]
+    paths += [Path(out_dir) / "graph.json", Path(out_dir) / 'run_report.json', Path(cfg_path)]
     paths += [
         Path(data_dir) / f"{name}.parquet"
         for name in ("nodes", "edges", "transactions")
@@ -277,6 +277,16 @@ def load_context(out_dir, data_dir, cfg_path):
     out_dir, data_dir, cfg_path = Path(out_dir), Path(data_dir), Path(cfg_path)
     data_dir = data_directory(data_dir)
     state = Context()
+    report_path = out_dir / 'run_report.json'
+    if report_path.is_file():
+        try:
+            report = json.loads(report_path.read_text(encoding='utf-8'))
+            if not isinstance(report, dict) or report.get('status') != 'ok':
+                raise ValueError('последний расчёт не завершён успешно')
+        except (ValueError, OSError):
+            state.warnings.append('Результаты не показаны: run_report.json не подтверждает успешный расчёт. Повторите run.py.')
+            state.fingerprint = hashlib.sha256(repr(file_signature(out_dir, data_dir, cfg_path)).encode()).hexdigest()[:16]
+            return state
     frames = {
         name: _frame(out_dir / f"{name}.csv", columns, state)
         for name, columns in SCHEMAS.items()

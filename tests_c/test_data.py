@@ -80,3 +80,10 @@ def test_unknown_edge_endpoint_is_reported(tmp_path):
     )
     ctx = load_context(tmp_path, tmp_path, tmp_path / "config.yaml")
     assert any("неизвестный узел" in w for w in ctx.warnings)
+
+
+def test_failed_run_does_not_show_previous_graph(tmp_path):
+    (tmp_path / 'graph.json').write_text(json.dumps({'nodes': [dict(id=1, x=0, y=0)], 'edges': []}))
+    (tmp_path / 'run_report.json').write_text(json.dumps({'status': 'failed'}))
+    ctx = load_context(tmp_path, tmp_path, tmp_path / 'config.yaml')
+    assert not ctx.graph and any('run_report.json' in warning for warning in ctx.warnings)
